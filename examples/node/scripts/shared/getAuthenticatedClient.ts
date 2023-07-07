@@ -1,9 +1,9 @@
-import { LensClient, development } from "@lens-protocol/client";
+import { LensClient, production } from "@lens-protocol/client";
 import { Wallet } from "ethers";
 
 export async function getAuthenticatedClient(wallet: Wallet): Promise<LensClient> {
   const lensClient = new LensClient({
-    environment: development,
+    environment: production,
   });
 
   const address = await wallet.getAddress();

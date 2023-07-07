@@ -123,13 +123,13 @@ export function useCurrentSession(): ReadResult<
       };
     }
 
-    if (prevSessionValue.type === SessionType.WithProfile) {
-      never(
-        `Cannot retain previous session data while fetching Profile [ID:${session.profile.id}]\n` +
-          `The previous authenticated session is for Profile [ID:${prevSessionValue.profile.id}].\n` +
-          'This should never happen. If it does, please report it as a bug.',
-      );
-    }
+    // if (prevSessionValue.type === SessionType.WithProfile) {
+    //   never(
+    //     `Cannot retain previous session data while fetching Profile [ID:${session.profile.id}]\n` +
+    //       `The previous authenticated session is for Profile [ID:${prevSessionValue.profile.id}].\n` +
+    //       'This should never happen. If it does, please report it as a bug.',
+    //   );
+    // }
 
     return {
       data: prevSessionValue,
