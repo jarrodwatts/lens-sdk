@@ -106,43 +106,45 @@ describe(`Given a cursor-based paginated query field`, () => {
         });
       });
 
-      it(`should:
-          - NOT update the "pageInfo.next" cursor if the incoming result is empty
-          - unset the "pageInfo.moreAfter" flag`, async () => {
-        const initialResult = mockHeroPaginatedResult({
-          next: nextCursor,
-          prev: prevCursor,
-        });
-        const observable = setupObservable([
-          mockGetHeroResponse({
-            result: initialResult,
-          }),
-          mockGetHeroResponse({
-            cursor: nextCursor,
-            result: mockHeroPaginatedResult({
-              items: [],
-              prev: null,
-              next: null,
+      describe('but the incoming result is empty', () => {
+        it(`should:
+            - NOT update the "pageInfo.next" cursor
+            - unset the "pageInfo.moreAfter" flag`, async () => {
+          const initialResult = mockHeroPaginatedResult({
+            next: nextCursor,
+            prev: prevCursor,
+          });
+          const observable = setupObservable([
+            mockGetHeroResponse({
+              result: initialResult,
             }),
-          }),
-        ]);
+            mockGetHeroResponse({
+              cursor: nextCursor,
+              result: mockHeroPaginatedResult({
+                items: [],
+                prev: null,
+                next: null,
+              }),
+            }),
+          ]);
 
-        await observable.result();
+          await observable.result();
 
-        await observable.fetchMore({
-          variables: {
-            cursor: nextCursor,
-          },
-        });
-        const { data } = await observable.result();
+          await observable.fetchMore({
+            variables: {
+              cursor: nextCursor,
+            },
+          });
+          const { data } = await observable.result();
 
-        expect(data.result).toMatchObject({
-          pageInfo: {
-            beforeCount: 0,
-            moreAfter: false,
-            next: initialResult.pageInfo.next,
-            prev: initialResult.pageInfo.prev,
-          },
+          expect(data.result).toMatchObject({
+            pageInfo: {
+              beforeCount: 0,
+              moreAfter: false,
+              next: initialResult.pageInfo.next,
+              prev: initialResult.pageInfo.prev,
+            },
+          });
         });
       });
     });
@@ -190,43 +192,45 @@ describe(`Given a cursor-based paginated query field`, () => {
         });
       });
 
-      it(`should:
-          - NOT update the "pageInfo.prev" cursor if the incoming result is empty
-          - update the "pageInfo.beforeCount = 0"`, async () => {
-        const initialResult = mockHeroPaginatedResult({
-          prev: prevCursor,
-          next: nextCursor,
-        });
-        const observable = setupObservable([
-          mockGetHeroResponse({
-            result: initialResult,
-          }),
-          mockGetHeroResponse({
-            cursor: prevCursor,
-            result: mockHeroPaginatedResult({
-              items: [],
-              prev: null,
-              next: null,
+      describe('but the incoming result is empty', () => {
+        it(`should:
+            - NOT update the "pageInfo.prev" cursor
+            - update the "pageInfo.beforeCount = 0"`, async () => {
+          const initialResult = mockHeroPaginatedResult({
+            prev: prevCursor,
+            next: nextCursor,
+          });
+          const observable = setupObservable([
+            mockGetHeroResponse({
+              result: initialResult,
             }),
-          }),
-        ]);
+            mockGetHeroResponse({
+              cursor: prevCursor,
+              result: mockHeroPaginatedResult({
+                items: [],
+                prev: null,
+                next: null,
+              }),
+            }),
+          ]);
 
-        await observable.result();
+          await observable.result();
 
-        await observable.fetchMore({
-          variables: {
-            cursor: prevCursor,
-          },
-        });
-        const { data } = await observable.result();
+          await observable.fetchMore({
+            variables: {
+              cursor: prevCursor,
+            },
+          });
+          const { data } = await observable.result();
 
-        expect(data.result).toMatchObject({
-          pageInfo: {
-            beforeCount: 0,
-            moreAfter: true,
-            next: initialResult.pageInfo.next,
-            prev: initialResult.pageInfo.prev,
-          },
+          expect(data.result).toMatchObject({
+            pageInfo: {
+              beforeCount: 0,
+              moreAfter: true,
+              next: initialResult.pageInfo.next,
+              prev: initialResult.pageInfo.prev,
+            },
+          });
         });
       });
     });
