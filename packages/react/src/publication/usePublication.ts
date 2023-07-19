@@ -32,6 +32,8 @@ export function usePublication({
             },
             observerId,
           }),
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-first',
         }),
       ),
     ),

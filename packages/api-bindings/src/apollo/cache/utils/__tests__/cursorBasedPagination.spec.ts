@@ -4,13 +4,13 @@ import { InvariantError } from '@lens-protocol/shared-kernel';
 
 import { mockCursor } from '../../../../mocks';
 import {
-  GetHeroData,
-  GetHeroDocument,
-  GetHeroVariables,
-  mockGetHeroResponse,
-  mockHeroPaginatedResult,
+  AnyPaginatedQueryData,
+  AnyPaginatedQueryDocument,
+  AnyPaginatedQueryVariables,
+  mockAnyPaginatedQueryResponse,
+  mockAnyPaginatedQueryResult,
 } from '../__helpers__/mocks';
-import { cursorBasedPagination } from '../cursorBasedPagination';
+import { cursorBasedPagination, newResultsProbe } from '../cursorBasedPagination';
 
 const initialCursor = mockCursor();
 const nextCursor = mockCursor();
@@ -34,8 +34,8 @@ function setupObservable(mocks: ReadonlyArray<MockedResponse<unknown>>) {
     }),
   });
 
-  return apollo.watchQuery<GetHeroData, GetHeroVariables>({
-    query: GetHeroDocument,
+  return apollo.watchQuery<AnyPaginatedQueryData, AnyPaginatedQueryVariables>({
+    query: AnyPaginatedQueryDocument,
   });
 }
 
@@ -44,8 +44,8 @@ describe(`Given a cursor-based paginated query field`, () => {
     describe('when fetching the initial page for the first time', () => {
       it('should set the "pageInfo.beforeCount = 0" so to assume there is not results newer than the provided', async () => {
         const observable = setupObservable([
-          mockGetHeroResponse({
-            result: mockHeroPaginatedResult({
+          mockAnyPaginatedQueryResponse({
+            result: mockAnyPaginatedQueryResult({
               prev: prevCursor,
               next: nextCursor,
             }),
@@ -66,22 +66,22 @@ describe(`Given a cursor-based paginated query field`, () => {
     describe('when fetching the next page', () => {
       it(`should:
           - append incoming items to the existing ones
-          - update "pageInfo.prev" to results prior the initial page and "pageInfo.next" to results after the last page
+          - update "pageInfo.prev" to results prior the first page and "pageInfo.next" to results after the new last page
           - update "pageInfo.moreAfter" accordingly`, async () => {
-        const initialResult = mockHeroPaginatedResult({
+        const initialResult = mockAnyPaginatedQueryResult({
           next: nextCursor,
           prev: prevCursor,
         });
-        const nextResult = mockHeroPaginatedResult({
+        const nextResult = mockAnyPaginatedQueryResult({
           next: mockCursor(),
           prev: initialCursor,
         });
         const observable = setupObservable([
-          mockGetHeroResponse({
+          mockAnyPaginatedQueryResponse({
             result: initialResult,
           }),
-          mockGetHeroResponse({
-            cursor: nextCursor,
+          mockAnyPaginatedQueryResponse({
+            variables: { cursor: nextCursor },
             result: nextResult,
           }),
         ]);
@@ -110,17 +110,17 @@ describe(`Given a cursor-based paginated query field`, () => {
         it(`should:
             - NOT update the "pageInfo.next" cursor
             - unset the "pageInfo.moreAfter" flag`, async () => {
-          const initialResult = mockHeroPaginatedResult({
+          const initialResult = mockAnyPaginatedQueryResult({
             next: nextCursor,
             prev: prevCursor,
           });
           const observable = setupObservable([
-            mockGetHeroResponse({
+            mockAnyPaginatedQueryResponse({
               result: initialResult,
             }),
-            mockGetHeroResponse({
-              cursor: nextCursor,
-              result: mockHeroPaginatedResult({
+            mockAnyPaginatedQueryResponse({
+              variables: { cursor: nextCursor },
+              result: mockAnyPaginatedQueryResult({
                 items: [],
                 prev: null,
                 next: null,
@@ -152,22 +152,22 @@ describe(`Given a cursor-based paginated query field`, () => {
     describe('when fetching the previous page', () => {
       it(`should:
           - prepend incoming items to the existing ones
-          - update the "pageInfo.prev" to results prior the initial page and "pageInfo.next" to results after the last page
+          - update the "pageInfo.prev" to results prior the new first page and "pageInfo.next" to results after the last page
           - update "pageInfo.beforeCount = 0" and "pageInfo.moreAfter" accordingly`, async () => {
-        const initialResult = mockHeroPaginatedResult({
+        const initialResult = mockAnyPaginatedQueryResult({
           prev: prevCursor,
           next: null,
         });
-        const prevResult = mockHeroPaginatedResult({
+        const prevResult = mockAnyPaginatedQueryResult({
           next: initialCursor,
           prev: mockCursor(),
         });
         const observable = setupObservable([
-          mockGetHeroResponse({
+          mockAnyPaginatedQueryResponse({
             result: initialResult,
           }),
-          mockGetHeroResponse({
-            cursor: prevCursor,
+          mockAnyPaginatedQueryResponse({
+            variables: { cursor: prevCursor },
             result: prevResult,
           }),
         ]);
@@ -196,17 +196,17 @@ describe(`Given a cursor-based paginated query field`, () => {
         it(`should:
             - NOT update the "pageInfo.prev" cursor
             - update the "pageInfo.beforeCount = 0"`, async () => {
-          const initialResult = mockHeroPaginatedResult({
+          const initialResult = mockAnyPaginatedQueryResult({
             prev: prevCursor,
             next: nextCursor,
           });
           const observable = setupObservable([
-            mockGetHeroResponse({
+            mockAnyPaginatedQueryResponse({
               result: initialResult,
             }),
-            mockGetHeroResponse({
-              cursor: prevCursor,
-              result: mockHeroPaginatedResult({
+            mockAnyPaginatedQueryResponse({
+              variables: { cursor: prevCursor },
+              result: mockAnyPaginatedQueryResult({
                 items: [],
                 prev: null,
                 next: null,
@@ -233,26 +233,70 @@ describe(`Given a cursor-based paginated query field`, () => {
           });
         });
       });
+
+      describe('as part of a query flagged as probe for newer results', () => {
+        it(`should:
+            - update the "pageInfo.beforeCount" to the number of results
+            - retains the existing items
+            - retain the "pageInfo.prev" cursor`, async () => {
+          const initialResult = mockAnyPaginatedQueryResult({
+            prev: prevCursor,
+            next: nextCursor,
+          });
+          const prevResult = mockAnyPaginatedQueryResult({
+            next: initialCursor,
+            prev: mockCursor(),
+          });
+          const observable = setupObservable([
+            mockAnyPaginatedQueryResponse({
+              result: initialResult,
+            }),
+            mockAnyPaginatedQueryResponse({
+              variables: newResultsProbe({ cursor: prevCursor }),
+              result: prevResult,
+            }),
+          ]);
+
+          await observable.result();
+
+          await observable.fetchMore({
+            variables: newResultsProbe({
+              cursor: prevCursor,
+            }),
+          });
+
+          const { data } = await observable.result();
+
+          expect(data.result).toMatchObject({
+            pageInfo: {
+              beforeCount: prevResult.items.length,
+              moreAfter: true,
+              next: initialResult.pageInfo.next,
+              prev: initialResult.pageInfo.prev,
+            },
+          });
+        });
+      });
     });
 
     describe('when fetching the initial page again', () => {
       it('should replace the existing items with the incoming ones', async () => {
-        const initialResult = mockHeroPaginatedResult({
+        const initialResult = mockAnyPaginatedQueryResult({
           next: nextCursor,
         });
-        const nextResult = mockHeroPaginatedResult({
+        const nextResult = mockAnyPaginatedQueryResult({
           next: mockCursor(),
           prev: initialCursor,
         });
         const observable = setupObservable([
-          mockGetHeroResponse({
+          mockAnyPaginatedQueryResponse({
             result: initialResult,
           }),
-          mockGetHeroResponse({
-            cursor: nextCursor,
+          mockAnyPaginatedQueryResponse({
+            variables: { cursor: nextCursor },
             result: nextResult,
           }),
-          mockGetHeroResponse({
+          mockAnyPaginatedQueryResponse({
             result: initialResult,
           }),
         ]);
@@ -274,15 +318,15 @@ describe(`Given a cursor-based paginated query field`, () => {
 
     describe('when the incoming items cannot be prepended or appended to the existing items', () => {
       const unknownCursor = mockCursor();
-      const unknownPageResponse = mockGetHeroResponse({
-        cursor: unknownCursor,
-        result: mockHeroPaginatedResult(),
+      const unknownPageResponse = mockAnyPaginatedQueryResponse({
+        variables: { cursor: unknownCursor },
+        result: mockAnyPaginatedQueryResult(),
       });
 
       it(`should throw an ${InvariantError.name}`, async () => {
         const observable = setupObservable([
-          mockGetHeroResponse({
-            result: mockHeroPaginatedResult(),
+          mockAnyPaginatedQueryResponse({
+            result: mockAnyPaginatedQueryResult(),
           }),
           unknownPageResponse,
         ]);
